@@ -42,9 +42,9 @@ private:
   int vertexAttr1;
   int colorAttr1;
   int normalAttr1;
-  int minAttr1;
-  int maxAttr1;
+  int texCoordAttr1;
   int matrixUniform1;
+  int textureUniform1;
   int vertexAttr2;
   int colorAttr2;
   int normalAttr2;

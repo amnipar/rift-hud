@@ -51,61 +51,38 @@ void QSceneWidget::paintTriangle()
 {
   GLfloat afVertices[] = {
     0.0f,  0.0f,  0.0f,
-    0.5f,  0.0f,  0.0f,
     0.0f,  0.5f,  0.0f,
-
-    0.0f,  0.0f,  0.0f,
-    0.5f,  0.0f,  0.0f,
-    0.0f,  0.0f,  0.5f,
-
-    0.0f,  0.0f,  0.0f,
-    0.0f,  0.5f,  0.0f,
-    0.0f,  0.0f,  0.5f,
-
-    0.0f,  0.0f,  0.0f,
-    0.0f,  0.5f,  0.0f,
-    0.5f,  0.0f,  0.0f,
-
-    0.0f,  0.0f,  0.0f,
-    0.0f,  0.0f,  0.5f,
-    0.5f,  0.0f,  0.0f,
-
-    0.0f,  0.0f,  0.0f,
-    0.0f,  0.0f,  0.5f,
-    0.0f,  0.5f,  0.0f
-  };
-  GLfloat afColors[] = {
-    1.0f, 1.0f, 1.0f, 1.0f,
-    1.0f, 0.0f, 0.0f, 1.0f,
-    0.0f, 1.0f, 0.0f, 1.0f,
-
-    1.0f, 1.0f, 1.0f, 1.0f,
-    1.0f, 0.0f, 0.0f, 1.0f,
-    0.0f, 0.0f, 1.0f, 1.0f,
-
-    1.0f, 1.0f, 1.0f, 1.0f,
-    0.0f, 1.0f, 0.0f, 1.0f,
-    0.0f, 0.0f, 1.0f, 1.0f,
-
-    1.0f, 1.0f, 1.0f, 1.0f,
-    0.0f, 1.0f, 0.0f, 1.0f,
-    1.0f, 0.0f, 0.0f, 1.0f,
-
-    1.0f, 1.0f, 1.0f, 1.0f,
-    0.0f, 0.0f, 1.0f, 1.0f,
-    1.0f, 0.0f, 0.0f, 1.0f,
-
-    1.0f, 1.0f, 1.0f, 1.0f,
-    0.0f, 0.0f, 1.0f, 1.0f,
-    0.0f, 1.0f, 0.0f, 1.0f
+    0.5f,  0.0f,  0.0f
   };
   program1.setAttributeArray(vertexAttr1, afVertices, 3);
+  
+  GLfloat afColors[] = {
+    1.0f, 1.0f, 1.0f, 1.0f,
+    1.0f, 1.0f, 1.0f, 1.0f,
+    1.0f, 1.0f, 1.0f, 1.0f
+  };
   program1.setAttributeArray(colorAttr1, afColors, 4);
+  
+  GLfloat afNormals[] = {
+    0,0,-1, 0,0,-1, 0,0,-1
+  };
+  program1.setAttributeArray(normalAttr1, afNormals, 3);
+  
+  GLfloat afTexCoord[] = {
+    0.0f,0.0f, 0.0f,1.0f, 1.0f,0.0f
+  };
+  program1.setAttributeArray(texCoordAttr1, afTexCoord, 2);
+  
   program1.enableAttributeArray(vertexAttr1);
   program1.enableAttributeArray(colorAttr1);
-  glDrawArrays(GL_TRIANGLES, 0, 18);
+  program1.enableAttributeArray(normalAttr1);
+  program1.enableAttributeArray(texCoordAttr1);
+  glBindTexture(GL_TEXTURE_2D, m_uiTexture);
+  glDrawArrays(GL_TRIANGLES, 0, 3);
   program1.disableAttributeArray(vertexAttr1);
   program1.disableAttributeArray(colorAttr1);
+  program1.disableAttributeArray(normalAttr1);
+  program1.disableAttributeArray(texCoordAttr1);
 }
 
 void QSceneWidget::paintTexturedQuad(GLuint texture)
@@ -186,17 +163,29 @@ void QSceneWidget::initializeGL ()
 {
   QGLShader *vshader1 = new QGLShader(QGLShader::Vertex, this);
   const char *vsrc1=
-      "attribute highp   vec4 vertex;\n"
+      "attribute highp vec4 vertex;\n"
+      "attribute highp vec4 texCoord;\n"
       "attribute mediump vec3 normal;\n"
       "attribute mediump vec4 color;\n"
-      "uniform   mediump mat4 matrix;\n"
-      "varying   mediump vec4 vcolor;\n"
+      "uniform mediump mat4 matrix;\n"
+      "varying mediump vec4 vcolor;\n"
+      "varying highp vec4 texc;\n"
+      "varying mediump float angle;\n"
+      "void main(void)\n"
+      "{\n"
+      "  vec3 toLight = normalize(vec3(0.0, 0.3, 1.0));\n"
+      "  angle = max(dot(normal, toLight), 0.0);\n"
+      /*"  gl_TexCoord[0] = gl_MultiTexCoord0;\n"*/
+      "  gl_Position = matrix * vertex;\n"
+      "  texc = texCoord;\n"
+      "}\n";
+      /*
       "void main(void)\n"
       "{\n"
       "    gl_Position = matrix * vertex;\n"
       "    vcolor = color;\n"
       "}\n";
-
+      */
   //"attribute mediump vec4 color;\n"
   //"varying   mediump vec4 g_vVSColor;\n"
   //"attribute mediump vec3 normal;\n"
@@ -206,12 +195,45 @@ void QSceneWidget::initializeGL ()
 
   QGLShader *fshader1 = new QGLShader(QGLShader::Fragment, this);
   const char *fsrc1 =
+      "varying highp vec4 texc;\n"
+      "uniform sampler2D tex;\n"
+      "varying mediump float angle;\n"
+      "const vec2 LeftLensCenter = vec2(0.2863248, 0.5);\n"
+      "const vec2 RightLensCenter = vec2(0.7136753, 0.5);\n"
+      "const vec2 LeftScreenCenter = vec2(0.25, 0.5);\n"
+      "const vec2 RightScreenCenter = vec2(0.75, 0.5);\n"
+      "const vec2 Scale = vec2(0.1469278, 0.2350845);\n"
+      "const vec2 ScaleIn = vec2(4, 2.5);\n"
+      "const vec4 HmdWarpParam   = vec4(1, 0.22, 0.24, 0);\n"
+      "vec2 HmdWarp(vec2 in01, vec2 LensCenter)\n"
+      "{\n"
+      "  vec2 theta = (in01 - LensCenter) * ScaleIn; // Scales to [-1, 1]\n"
+      "  float rSq = theta.x * theta.x + theta.y * theta.y;\n"
+      "  vec2 rvector = theta * (HmdWarpParam.x + HmdWarpParam.y * rSq +\n"
+      "      HmdWarpParam.z * rSq * rSq +\n"
+      "      HmdWarpParam.w * rSq * rSq * rSq);\n"
+      "  return LensCenter + Scale * rvector;\n"
+      "}\n"
+      "void main()\n"
+      "{\n"
+      "  vec2 LensCenter = gl_FragCoord.x < 640 ? LeftLensCenter : RightLensCenter;\n"
+      "  vec2 ScreenCenter = gl_FragCoord.x < 640 ? LeftScreenCenter : RightScreenCenter;\n"
+      "  vec2 oTexCoord = gl_FragCoord.xy / vec2(1280, 800);\n"
+      "  vec2 tc = HmdWarp(oTexCoord, LensCenter);\n"
+      "  if (any(bvec2(clamp(tc,ScreenCenter-vec2(0.25,0.5), ScreenCenter+vec2(0.25,0.5)) - tc))) {\n"
+      "    gl_FragColor = vec4(0.0, 0.0, 0.0, 1.0);\n"
+      "    return;\n"
+      "  }\n"
+      "  tc.x = gl_FragCoord.x < 640 ? (2.0 * tc.x) : (2.0 * (tc.x - 0.5));\n"
+      "  gl_FragColor = texture2D(tex, tc);\n"
+      "}\n";
+      /*
       "varying mediump vec4 vcolor;\n"
       "void main (void)\n"
       "{\n"
       "    gl_FragColor = vcolor;\n"
       "}\n";
-
+      */
   //vec4(1.0, 1.0, 0.66 ,1.0);\n"
   //"varying mediump vec4 g_vVSColor;\n"
   //g_vVSColor;\n"
@@ -235,7 +257,9 @@ void QSceneWidget::initializeGL ()
   vertexAttr1 = program1.attributeLocation("vertex");
   normalAttr1 = program1.attributeLocation("normal");
   colorAttr1 = program1.attributeLocation("color");
+  texCoordAttr1 = program1.attributeLocation("texCoord");
   matrixUniform1 = program1.uniformLocation("matrix");
+  textureUniform1 = program1.uniformLocation("tex");
 
   QGLShader *vshader2 = new QGLShader(QGLShader::Vertex);
   const char *vsrc2 =
@@ -306,6 +330,10 @@ void QSceneWidget::initializeGL ()
 
   //glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR );
   //glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR );
+  
+  m_uiTexture = bindTexture(QImage("texture1.png"), GL_TEXTURE_2D);
+  glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+  glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
   
   m_fAngle = 0;
   m_fScale = 1;
@@ -395,6 +423,19 @@ void QSceneWidget::paintGL()
   paintTexturedQuad(m_leftTexture);
   program2.release();
 
+  mobj.setToIdentity();
+  mobj.translate(-0.1f, -0.1f, 0.1f);
+  mobj *= mview;
+  mobj *= mproj;
+  program1.bind();
+  program1.setUniformValue(matrixUniform1, mobj);
+  paintTriangle();
+  program1.release();
+  
+  mobj.setToIdentity();
+  mobj.translate(0.4f, 0.2f, 0.3f);
+  mobj *= mview;
+  mobj *= mproj;
   program1.bind();
   program1.setUniformValue(matrixUniform1, mobj);
   paintTriangle();
@@ -431,6 +472,19 @@ void QSceneWidget::paintGL()
   paintTexturedQuad(m_rightTexture);
   program2.release();
   
+  mobj.setToIdentity();
+  mobj.translate(-0.1f, -0.1f, 0.1f);
+  mobj *= mview;
+  mobj *= mproj;
+  program1.bind();
+  program1.setUniformValue(matrixUniform1, mobj);
+  paintTriangle();
+  program1.release();
+  
+  mobj.setToIdentity();
+  mobj.translate(0.4f, 0.2f, 0.3f);
+  mobj *= mview;
+  mobj *= mproj;
   program1.bind();
   program1.setUniformValue(matrixUniform1, mobj);
   paintTriangle();
